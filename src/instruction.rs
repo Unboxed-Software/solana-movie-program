@@ -1,5 +1,5 @@
 use borsh::BorshDeserialize;
-use solana_program::{program_error::ProgramError, pubkey::Pubkey};
+use solana_program::program_error::ProgramError;
 
 pub enum MovieInstruction {
     AddMovieReview {
@@ -12,10 +12,6 @@ pub enum MovieInstruction {
         rating: u8,
         description: String,
     },
-    AddComment {
-        review: Pubkey,
-        comment: String,
-    },
 }
 
 #[derive(BorshDeserialize)]
@@ -25,42 +21,23 @@ struct MovieReviewPayload {
     description: String,
 }
 
-#[derive(BorshDeserialize)]
-struct CommentPayload {
-    review: Pubkey,
-    comment: String,
-}
-
 impl MovieInstruction {
     pub fn unpack(input: &[u8]) -> Result<Self, ProgramError> {
         let (&variant, rest) = input
             .split_first()
             .ok_or(ProgramError::InvalidInstructionData)?;
+        let payload = MovieReviewPayload::try_from_slice(rest).unwrap();
         Ok(match variant {
-            0 => {
-                let payload = MovieReviewPayload::try_from_slice(rest).unwrap();
-                Self::AddMovieReview {
-                    title: payload.title,
-                    rating: payload.rating,
-                    description: payload.description,
-                }
-            }
-
-            1 => {
-                let payload = MovieReviewPayload::try_from_slice(rest).unwrap();
-                Self::UpdateMovieReview {
-                    title: payload.title,
-                    rating: payload.rating,
-                    description: payload.description,
-                }
-            }
-            2 => {
-                let payload = CommentPayload::try_from_slice(rest).unwrap();
-                Self::AddComment {
-                    review: payload.review,
-                    comment: payload.comment,
-                }
-            }
+            0 => Self::AddMovieReview {
+                title: payload.title,
+                rating: payload.rating,
+                description: payload.description,
+            },
+            1 => Self::UpdateMovieReview {
+                title: payload.title,
+                rating: payload.rating,
+                description: payload.description,
+            },
             _ => return Err(ProgramError::InvalidInstructionData),
         })
     }
