@@ -117,6 +117,7 @@ pub fn add_movie_review(
         return Err(ProgramError::AccountAlreadyInitialized);
     }
 
+    account_data.reviewer = *initializer.key;
     account_data.title = title;
     account_data.rating = rating;
     account_data.description = description;
