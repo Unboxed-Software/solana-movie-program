@@ -5,21 +5,16 @@ pub enum MovieInstruction {
     AddMovieReview {
         title: String,
         rating: u8,
-        description: String
+        description: String,
     },
     UpdateMovieReview {
         title: String,
         rating: u8,
-        description: String
+        description: String,
     },
     AddComment {
-        comment: String
-    }
-}
-
-#[derive(BorshDeserialize)]
-struct CommentPayload {
-    comment: String
+        comment: String,
+    },
 }
 
 #[derive(BorshDeserialize)]
@@ -29,33 +24,40 @@ struct MovieReviewPayload {
     description: String,
 }
 
+#[derive(BorshDeserialize)]
+struct CommentPayload {
+    comment: String,
+}
+
 impl MovieInstruction {
     pub fn unpack(input: &[u8]) -> Result<Self, ProgramError> {
-        let (&variant, rest) = input.split_first().ok_or(ProgramError::InvalidInstructionData)?;
+        let (&variant, rest) = input
+            .split_first()
+            .ok_or(ProgramError::InvalidInstructionData)?;
         Ok(match variant {
             0 => {
                 let payload = MovieReviewPayload::try_from_slice(rest).unwrap();
                 Self::AddMovieReview {
-                title: payload.title,
-                rating: payload.rating,
-                description: payload.description }
-            },
-
+                    title: payload.title,
+                    rating: payload.rating,
+                    description: payload.description,
+                }
+            }
             1 => {
                 let payload = MovieReviewPayload::try_from_slice(rest).unwrap();
                 Self::UpdateMovieReview {
                     title: payload.title,
                     rating: payload.rating,
-                    description: payload.description
+                    description: payload.description,
                 }
-            },
+            }
             2 => {
                 let payload = CommentPayload::try_from_slice(rest).unwrap();
                 Self::AddComment {
-                    comment: payload.comment
+                    comment: payload.comment,
                 }
             }
-            _ => return Err(ProgramError::InvalidInstructionData)
+            _ => return Err(ProgramError::InvalidInstructionData),
         })
     }
 }
