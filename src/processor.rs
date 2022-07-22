@@ -221,7 +221,7 @@ pub fn add_movie_review(
         // account_infos
         &[token_mint.clone(), user_ata.clone(), mint_auth.clone()],
         // seeds
-        &[&[b"token_mint", &[mint_bump]]],
+        &[&[b"token_auth", &[mint_bump]]],
     )?;
 
     Ok(())
@@ -426,7 +426,7 @@ pub fn add_comment(
         // account_infos
         &[token_mint.clone(), user_ata.clone(), mint_auth.clone()],
         // seeds
-        &[&[b"token_mint", &[mint_bump]]],
+        &[&[b"token_auth", &[mint_bump]]],
     )?;
 
     Ok(())
