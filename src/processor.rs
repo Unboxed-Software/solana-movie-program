@@ -539,23 +539,7 @@ mod tests {
         .start()
         .await;
  
-        // Derive PDA for token mint authority
-        let (mint, _bump_seed) = Pubkey::find_program_address(&[b"token_mint"], &program_id);
-        let (mint_auth, _bump_seed) = Pubkey::find_program_address(&[b"token_auth"], &program_id);
-
-        
-        let init_mint_ix = Instruction {
-            program_id: program_id,
-            accounts: vec![
-                AccountMeta::new_readonly(payer.pubkey(), true),
-                AccountMeta::new(mint, false),
-                AccountMeta::new(mint_auth, false),
-                AccountMeta::new_readonly(SYSTEM_PROGRAM_ID, false),
-                AccountMeta::new_readonly(TOKEN_PROGRAM_ID, false),
-                AccountMeta::new_readonly(SYSVAR_RENT_ID, false)
-            ],
-            data: vec![3]
-        };
+        let (_mint, _mint_auth, init_mint_ix) = create_init_mint_ix(payer.pubkey(), program_id);
 
         // Create transaction object with instructions, accounts, and input data
         let mut transaction = Transaction::new_with_payer(
@@ -566,7 +550,6 @@ mod tests {
 
         // Process transaction and compare the result
         assert_matches!(banks_client.process_transaction(transaction).await, Ok(_));
-
     }
  
     // Second unit test
@@ -581,22 +564,7 @@ mod tests {
         .start()
         .await;
  
-        // Derive PDA for token mint authority
-        let (mint, _bump_seed) = Pubkey::find_program_address(&[b"token_mint"], &program_id);
-        let (mint_auth, _bump_seed) = Pubkey::find_program_address(&[b"token_auth"], &program_id);
-
-        let init_mint_ix = Instruction {
-            program_id: program_id,
-            accounts: vec![
-                AccountMeta::new_readonly(payer.pubkey(), true),
-                AccountMeta::new(mint, false),
-                AccountMeta::new(mint_auth, false),
-                AccountMeta::new_readonly(SYSTEM_PROGRAM_ID, false),
-                AccountMeta::new_readonly(TOKEN_PROGRAM_ID, false),
-                AccountMeta::new_readonly(SYSVAR_RENT_ID, false)
-            ],
-            data: vec![3]
-        };
+        let (mint, mint_auth, init_mint_ix) = create_init_mint_ix(payer.pubkey(), program_id);
 
         // Create review PDA
         let title: String = "Captain America".to_owned();
@@ -663,5 +631,26 @@ mod tests {
 
         // Process transaction and compare the result
         assert_matches!(banks_client.process_transaction(transaction).await, Ok(_));
+    }
+
+    fn create_init_mint_ix(payer: Pubkey, program_id: Pubkey) -> (Pubkey, Pubkey, Instruction) {
+        // Derive PDA for token mint authority
+        let (mint, _bump_seed) = Pubkey::find_program_address(&[b"token_mint"], &program_id);
+        let (mint_auth, _bump_seed) = Pubkey::find_program_address(&[b"token_auth"], &program_id);
+
+        let init_mint_ix = Instruction {
+            program_id: program_id,
+            accounts: vec![
+                AccountMeta::new_readonly(payer, true),
+                AccountMeta::new(mint, false),
+                AccountMeta::new(mint_auth, false),
+                AccountMeta::new_readonly(SYSTEM_PROGRAM_ID, false),
+                AccountMeta::new_readonly(TOKEN_PROGRAM_ID, false),
+                AccountMeta::new_readonly(SYSVAR_RENT_ID, false)
+            ],
+            data: vec![3]
+        };
+
+        (mint, mint_auth, init_mint_ix)
     }
 }
