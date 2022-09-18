@@ -501,3 +501,52 @@ pub fn initialize_token_mint(program_id: &Pubkey, accounts: &[AccountInfo]) -> P
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use {
+        super::*,
+        assert_matches::*,
+        solana_program::{
+            instruction::{AccountMeta, Instruction},
+            system_program::ID as SYSTEM_PROGRAM_ID,
+        },
+        solana_program_test::*,
+        solana_sdk::{
+            signature::Signer, sysvar::rent::ID as SYSVAR_RENT_ID, transaction::Transaction,
+        },
+        spl_associated_token_account::{
+            get_associated_token_address, instruction::create_associated_token_account,
+        },
+        spl_token::ID as TOKEN_PROGRAM_ID,
+    };
+
+    // First unit test
+    #[tokio::test]
+    async fn it_works() {
+        let program_id = Pubkey::new_unique();
+        let (_banks_client, payer, recent_blockhash) =
+            ProgramTest::new("pda_local", program_id, processor!(process_instruction))
+                .start()
+                .await;
+
+        let (mint, _bump_seed) = Pubkey::find_program_address(&[b"token_mint"], &program_id);
+        let (mint_auth, _bump_seed) = Pubkey::find_program_address(&[b"token_auth"], &program_id);
+
+        let init_mint_ix = Instruction {
+            program_id: program_id,
+            accounts: vec![
+                AccountMeta::new_readonly(payer.pubkey(), true),
+                AccountMeta::new(mint, false),
+                AccountMeta::new(mint_auth, false),
+                AccountMeta::new_readonly(SYSTEM_PROGRAM_ID, false),
+                AccountMeta::new_readonly(TOKEN_PROGRAM_ID, false),
+                AccountMeta::new_readonly(SYSVAR_RENT_ID, false),
+            ],
+            data: vec![3],
+        };
+
+        let mut transaction = Transaction::new_with_payer(&[init_mint_ix], Some(&payer.pubkey()));
+        transaction.sign(&[&payer], recent_blockhash);
+    }
+}
