@@ -521,22 +521,125 @@ mod tests {
         spl_token::ID as TOKEN_PROGRAM_ID,
     };
 
-    // First unit test
     #[tokio::test]
-    async fn it_works() {
+    async fn test_initialize_mint_instruction() {
         let program_id = Pubkey::new_unique();
-        let (_banks_client, payer, recent_blockhash) =
-            ProgramTest::new("pda_local", program_id, processor!(process_instruction))
-                .start()
-                .await;
+        let (mut banks_client, payer, recent_blockhash) = ProgramTest::new(
+            "movie_review_program",
+            program_id,
+            processor!(process_instruction),
+        )
+        .start()
+        .await;
 
+        let (_mint, _mint_auth, init_mint_ix) = create_init_mint_ix(payer.pubkey(), program_id);
+
+        let mut transaction = Transaction::new_with_payer(&[init_mint_ix], Some(&payer.pubkey()));
+        transaction.sign(&[&payer], recent_blockhash);
+
+        assert_matches!(banks_client.process_transaction(transaction).await, Ok(_));
+    }
+
+    #[tokio::test]
+    async fn test_add_movie_review_instruction() {
+        let program_id = Pubkey::new_unique();
+        let (mut banks_client, payer, recent_blockhash) = ProgramTest::new(
+            "movie_review_program",
+            program_id,
+            processor!(process_instruction),
+        )
+        .start()
+        .await;
+
+        let (mint, mint_auth, init_mint_ix) = create_init_mint_ix(payer.pubkey(), program_id);
+
+        let title: String = "Captain America".to_owned();
+        let rating: u8 = 3;
+        let description: String = "Liked the movie".to_owned();
+        let init_ata_ix: Instruction =
+            create_associated_token_account(&payer.pubkey(), &payer.pubkey(), &mint);
+        let user_ata: Pubkey = get_associated_token_address(&payer.pubkey(), &mint);
+        let add_movie_review_ix = create_add_movie_review_ix(
+            payer.pubkey(),
+            program_id,
+            title,
+            rating,
+            description,
+            mint,
+            mint_auth,
+            user_ata,
+            SYSTEM_PROGRAM_ID,
+            TOKEN_PROGRAM_ID,
+        );
+
+        let mut transaction = Transaction::new_with_payer(
+            &[init_mint_ix, init_ata_ix, add_movie_review_ix],
+            Some(&payer.pubkey()),
+        );
+
+        transaction.sign(&[&payer], recent_blockhash);
+
+        assert_matches!(banks_client.process_transaction(transaction).await, Ok(_));
+    }
+
+    fn create_add_movie_review_ix(
+        payer: Pubkey,
+        program_id: Pubkey,
+        title: String,
+        rating: u8,
+        description: String,
+        mint: Pubkey,
+        mint_auth: Pubkey,
+        user_ata: Pubkey,
+        system_program: Pubkey,
+        token_program: Pubkey,
+    ) -> Instruction {
+        let (review_pda, _bump_seed) =
+            Pubkey::find_program_address(&[payer.as_ref(), title.as_bytes()], &program_id);
+
+        let (comment_pda, _bump_seed) =
+            Pubkey::find_program_address((&[review_pda.as_ref(), b"comment"]), &program_id);
+
+        let mut data_vec = vec![0];
+        data_vec.append(
+            &mut (TryInto::<u32>::try_into(title.len()).unwrap().to_le_bytes())
+                .try_into()
+                .unwrap(),
+        );
+        data_vec.append(&mut title.into_bytes());
+        data_vec.push(rating);
+        data_vec.append(
+            &mut (TryInto::<u32>::try_into(description.len())
+                .unwrap()
+                .to_le_bytes())
+            .try_into()
+            .unwrap(),
+        );
+        data_vec.append(&mut description.into_bytes());
+
+        Instruction {
+            program_id: program_id,
+            accounts: vec![
+                AccountMeta::new_readonly(payer, true),
+                AccountMeta::new(review_pda, false),
+                AccountMeta::new(comment_pda, false),
+                AccountMeta::new(mint, false),
+                AccountMeta::new_readonly(mint_auth, false),
+                AccountMeta::new(user_ata, false),
+                AccountMeta::new_readonly(system_program, false),
+                AccountMeta::new_readonly(token_program, false),
+            ],
+            data: data_vec,
+        }
+    }
+
+    fn create_init_mint_ix(payer: Pubkey, program_id: Pubkey) -> (Pubkey, Pubkey, Instruction) {
         let (mint, _bump_seed) = Pubkey::find_program_address(&[b"token_mint"], &program_id);
         let (mint_auth, _bump_seed) = Pubkey::find_program_address(&[b"token_auth"], &program_id);
-
         let init_mint_ix = Instruction {
             program_id: program_id,
             accounts: vec![
-                AccountMeta::new_readonly(payer.pubkey(), true),
+                AccountMeta::new_readonly(payer, true),
                 AccountMeta::new(mint, false),
                 AccountMeta::new(mint_auth, false),
                 AccountMeta::new_readonly(SYSTEM_PROGRAM_ID, false),
@@ -546,7 +649,6 @@ mod tests {
             data: vec![3],
         };
 
-        let mut transaction = Transaction::new_with_payer(&[init_mint_ix], Some(&payer.pubkey()));
-        transaction.sign(&[&payer], recent_blockhash);
+        (mint, mint_auth, init_mint_ix)
     }
 }

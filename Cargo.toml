@@ -1,5 +1,5 @@
 [package]
-name = "pda-local"
+name = "movie-review-program"
 version = "0.1.0"
 edition = "2021"
 
@@ -20,3 +20,8 @@ solana-sdk = "~1.10.29"
 
 [lib]
 crate-type = ["cdylib", "lib"]
+
+[dev-dependencies]
+assert_matches = "1.4.0"
+solana-program-test = "~1.10.29"
+solana-sdk = "~1.10.29"
