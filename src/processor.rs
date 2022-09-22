@@ -183,8 +183,8 @@ pub fn add_movie_review(
 
     // mint tokens here
     msg!("deriving mint authority");
-    let (mint_pda, mint_bump) = Pubkey::find_program_address(&[b"token_mint"], program_id);
-    let (mint_auth_pda, _mint_auth_bump) =
+    let (mint_pda, _mint_bump) = Pubkey::find_program_address(&[b"token_mint"], program_id);
+    let (mint_auth_pda, mint_auth_bump) =
         Pubkey::find_program_address(&[b"token_auth"], program_id);
 
     if *token_mint.key != mint_pda {
@@ -221,7 +221,7 @@ pub fn add_movie_review(
         // account_infos
         &[token_mint.clone(), user_ata.clone(), mint_auth.clone()],
         // seeds
-        &[&[b"token_auth", &[mint_bump]]],
+        &[&[b"token_auth", &[mint_auth_bump]]],
     )?;
 
     Ok(())
@@ -388,8 +388,8 @@ pub fn add_comment(
 
     // mint tokens here
     msg!("deriving mint authority");
-    let (mint_pda, mint_bump) = Pubkey::find_program_address(&[b"token_mint"], program_id);
-    let (mint_auth_pda, _mint_auth_bump) =
+    let (mint_pda, _mint_bump) = Pubkey::find_program_address(&[b"token_mint"], program_id);
+    let (mint_auth_pda, mint_auth_bump) =
         Pubkey::find_program_address(&[b"token_auth"], program_id);
 
     if *token_mint.key != mint_pda {
@@ -426,7 +426,7 @@ pub fn add_comment(
         // account_infos
         &[token_mint.clone(), user_ata.clone(), mint_auth.clone()],
         // seeds
-        &[&[b"token_auth", &[mint_bump]]],
+        &[&[b"token_auth", &[mint_auth_bump]]],
     )?;
 
     Ok(())
