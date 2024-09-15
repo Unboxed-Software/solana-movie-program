@@ -22,23 +22,30 @@ struct MovieReviewPayload {
 }
 
 impl MovieInstruction {
+    pub const INSTRUCTION_DISCRIMINATOR_SIZE: usize = 1;
+
     pub fn unpack(input: &[u8]) -> Result<Self, ProgramError> {
-        let (&variant, rest) = input
-            .split_first()
-            .ok_or(ProgramError::InvalidInstructionData)?;
-        let payload = MovieReviewPayload::try_from_slice(rest).unwrap();
-        Ok(match variant {
-            0 => Self::AddMovieReview {
+        if input.len() < Self::INSTRUCTION_DISCRIMINATOR_SIZE {
+            return Err(ProgramError::InvalidInstructionData);
+        }
+
+        let (instruction_discriminator, rest) =
+            input.split_at(Self::INSTRUCTION_DISCRIMINATOR_SIZE);
+        let payload = MovieReviewPayload::try_from_slice(rest)
+            .map_err(|_| ProgramError::InvalidInstructionData)?;
+
+        match instruction_discriminator[0] {
+            0 => Ok(Self::AddMovieReview {
                 title: payload.title,
                 rating: payload.rating,
                 description: payload.description,
-            },
-            1 => Self::UpdateMovieReview {
+            }),
+            1 => Ok(Self::UpdateMovieReview {
                 title: payload.title,
                 rating: payload.rating,
                 description: payload.description,
-            },
-            _ => return Err(ProgramError::InvalidInstructionData),
-        })
+            }),
+            _ => Err(ProgramError::InvalidInstructionData),
+        }
     }
 }

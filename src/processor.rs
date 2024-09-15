@@ -1,20 +1,19 @@
 use crate::error::ReviewError;
 use crate::instruction::MovieInstruction;
 use crate::state::MovieAccountState;
-use borsh::BorshSerialize;
+use borsh::{BorshDeserialize, BorshSerialize};
+use solana_program::program_pack::IsInitialized;
 use solana_program::{
     account_info::{next_account_info, AccountInfo},
-    borsh::try_from_slice_unchecked,
     entrypoint::ProgramResult,
     msg,
     program::invoke_signed,
     program_error::ProgramError,
-    program_pack::IsInitialized,
     pubkey::Pubkey,
+    rent::Rent,
     system_instruction,
-    sysvar::{rent::Rent, Sysvar},
+    sysvar::Sysvar,
 };
-use std::convert::TryInto;
 
 pub fn process_instruction(
     program_id: &Pubkey,
@@ -49,41 +48,43 @@ pub fn add_movie_review(
     msg!("Description: {}", description);
 
     let account_info_iter = &mut accounts.iter();
-
     let initializer = next_account_info(account_info_iter)?;
     let pda_account = next_account_info(account_info_iter)?;
     let system_program = next_account_info(account_info_iter)?;
 
+    // Validate signer
     if !initializer.is_signer {
         msg!("Missing required signature");
         return Err(ProgramError::MissingRequiredSignature);
     }
 
+    // Derive and validate PDA
     let (pda, bump_seed) = Pubkey::find_program_address(
         &[initializer.key.as_ref(), title.as_bytes().as_ref()],
         program_id,
     );
     if pda != *pda_account.key {
         msg!("Invalid seeds for PDA");
-        return Err(ProgramError::InvalidArgument);
+        return Err(ReviewError::InvalidPDA.into());
     }
 
+    // Validate rating
     if rating > 5 || rating < 1 {
         msg!("Rating cannot be higher than 5");
         return Err(ReviewError::InvalidRating.into());
     }
 
+    // Validate data length
+    let account_len: usize = 1000;
     let total_len: usize = 1 + 1 + (4 + title.len()) + (4 + description.len());
-    if total_len > 1000 {
+    if total_len > account_len {
         msg!("Data length is larger than 1000 bytes");
         return Err(ReviewError::InvalidDataLength.into());
     }
 
-    let account_len: usize = 1000;
-
+    // Calculate rent and create account
     let rent = Rent::get()?;
     let rent_lamports = rent.minimum_balance(account_len);
-
     invoke_signed(
         &system_instruction::create_account(
             initializer.key,
@@ -106,26 +107,28 @@ pub fn add_movie_review(
 
     msg!("PDA created: {}", pda);
 
-    msg!("unpacking state account");
-    let mut account_data =
-        try_from_slice_unchecked::<MovieAccountState>(&pda_account.data.borrow()).unwrap();
-    msg!("borrowed account data");
+    // Deserialize and initialize account data
+    msg!("Unpacking state account");
+    let mut account_data = MovieAccountState::try_from_slice(&pda_account.data.borrow())?;
+    msg!("Borrowed account data");
 
-    msg!("checking if movie account is already initialized");
+    msg!("Checking if movie account is already initialized");
     if account_data.is_initialized() {
         msg!("Account already initialized");
         return Err(ProgramError::AccountAlreadyInitialized);
     }
 
+    // Set account data
     account_data.reviewer = *initializer.key;
     account_data.title = title;
     account_data.rating = rating;
     account_data.description = description;
     account_data.is_initialized = true;
 
-    msg!("serializing account");
+    // Serialize account data
+    msg!("Serializing account");
     account_data.serialize(&mut &mut pda_account.data.borrow_mut()[..])?;
-    msg!("state account serialized");
+    msg!("State account serialized");
 
     Ok(())
 }
@@ -133,31 +136,31 @@ pub fn add_movie_review(
 pub fn update_movie_review(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
-    title: String,
+    _title: String,
     rating: u8,
     description: String,
 ) -> ProgramResult {
     msg!("Updating movie review...");
 
     let account_info_iter = &mut accounts.iter();
-
     let initializer = next_account_info(account_info_iter)?;
     let pda_account = next_account_info(account_info_iter)?;
 
+    // Validate account ownership and signer
     if pda_account.owner != program_id {
         return Err(ProgramError::IllegalOwner);
     }
-
     if !initializer.is_signer {
         msg!("Missing required signature");
         return Err(ProgramError::MissingRequiredSignature);
     }
 
-    msg!("unpacking state account");
-    let mut account_data =
-        try_from_slice_unchecked::<MovieAccountState>(&pda_account.data.borrow()).unwrap();
-    msg!("review title: {}", account_data.title);
+    // Deserialize account data
+    msg!("Unpacking state account");
+    let mut account_data = MovieAccountState::try_from_slice(&pda_account.data.borrow())?;
+    msg!("Review title: {}", account_data.title);
 
+    // Validate PDA
     let (pda, _bump_seed) = Pubkey::find_program_address(
         &[
             initializer.key.as_ref(),
@@ -170,39 +173,46 @@ pub fn update_movie_review(
         return Err(ReviewError::InvalidPDA.into());
     }
 
-    msg!("checking if movie account is initialized");
+    // Check account initialization
+    msg!("Checking if movie account is initialized");
     if !account_data.is_initialized() {
         msg!("Account is not initialized");
         return Err(ReviewError::UninitializedAccount.into());
     }
 
+    // Validate rating
     if rating > 5 || rating < 1 {
         msg!("Invalid Rating");
         return Err(ReviewError::InvalidRating.into());
     }
 
+    // Check data length
     let update_len: usize = 1 + 1 + (4 + description.len()) + account_data.title.len();
     if update_len > 1000 {
         msg!("Data length is larger than 1000 bytes");
         return Err(ReviewError::InvalidDataLength.into());
     }
 
+    // Log review details before update
     msg!("Review before update:");
     msg!("Title: {}", account_data.title);
     msg!("Rating: {}", account_data.rating);
     msg!("Description: {}", account_data.description);
 
+    // Update account data
     account_data.rating = rating;
     account_data.description = description;
 
+    // Log review details after update
     msg!("Review after update:");
     msg!("Title: {}", account_data.title);
     msg!("Rating: {}", account_data.rating);
     msg!("Description: {}", account_data.description);
 
-    msg!("serializing account");
+    // Serialize updated account data
+    msg!("Serializing account");
     account_data.serialize(&mut &mut pda_account.data.borrow_mut()[..])?;
-    msg!("state account serialized");
+    msg!("State account serialized");
 
     Ok(())
 }
