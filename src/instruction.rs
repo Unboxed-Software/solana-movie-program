@@ -32,7 +32,7 @@ struct CommentPayload {
 impl MovieInstruction {
 
     pub fn unpack(input: &[u8]) -> Result<Self, ProgramError> {
-        let (discriminator, rest) = input
+        let (&discriminator, rest) = input
             .split_first()
             .ok_or(ProgramError::InvalidInstructionData)?;
 
