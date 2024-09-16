@@ -32,34 +32,38 @@ struct CommentPayload {
 
 impl MovieInstruction {
     pub fn unpack(input: &[u8]) -> Result<Self, ProgramError> {
-        let (&variant, rest) = input
+        let (&discriminator, rest) = input
             .split_first()
             .ok_or(ProgramError::InvalidInstructionData)?;
-        Ok(match variant {
+
+        match discriminator {
             0 => {
-                let payload = MovieReviewPayload::try_from_slice(rest).unwrap();
-                Self::AddMovieReview {
+                let payload = MovieReviewPayload::try_from_slice(rest)
+                    .map_err(|_| ProgramError::InvalidInstructionData)?;
+                Ok(Self::AddMovieReview {
                     title: payload.title,
                     rating: payload.rating,
                     description: payload.description,
-                }
+                })
             }
             1 => {
-                let payload = MovieReviewPayload::try_from_slice(rest).unwrap();
-                Self::UpdateMovieReview {
+                let payload = MovieReviewPayload::try_from_slice(rest)
+                    .map_err(|_| ProgramError::InvalidInstructionData)?;
+                Ok(Self::UpdateMovieReview {
                     title: payload.title,
                     rating: payload.rating,
                     description: payload.description,
-                }
+                })
             }
             2 => {
-                let payload = CommentPayload::try_from_slice(rest).unwrap();
-                Self::AddComment {
+                let payload = CommentPayload::try_from_slice(rest)
+                    .map_err(|_| ProgramError::InvalidInstructionData)?;
+                Ok(Self::AddComment {
                     comment: payload.comment,
-                }
+                })
             }
-            3 => Self::InitializeMint,
+            3 => Ok(Self::InitializeMint),
             _ => return Err(ProgramError::InvalidInstructionData),
-        })
+        }
     }
 }

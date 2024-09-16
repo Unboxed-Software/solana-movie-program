@@ -5,16 +5,12 @@ use thiserror::Error;
 pub enum ReviewError {
     #[error("Account not initialized yet")]
     UninitializedAccount,
-
     #[error("PDA derived does not equal PDA passed in")]
     InvalidPDA,
-
     #[error("Input data exceeds max length")]
     InvalidDataLength,
-
     #[error("Rating greater than 5 or less than 1")]
     InvalidRating,
-
     #[error("Accounts do not match")]
     IncorrectAccountError,
 }
